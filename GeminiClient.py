@@ -8,6 +8,8 @@ from .ToolExecutor import ToolExecutor
 from .ToolsExecutionResult import ToolsExecutionResult
 from .FunctionCall import FunctionCall
 from .exceptions import GeminiAPIError, GeminiResponseError, GeminiToolExecutionError, GeminiClientError
+from .CacheManager import CacheManager
+from .CacheConfig import CacheConfig
 
 class GeminiClient:
     def __init__(self, api_key: str):
@@ -21,27 +23,33 @@ class GeminiClient:
             "automatic_function_calling": {"disable": True},
             "tool_config": {"function_calling_config": {"mode": "any"}},
         }
+        self.cache_manager = CacheManager(self.client)
 
-    def _get_config_with_tools(self, tools: List[Tool], tool_mode: str = "any") -> Dict:
+    def _get_config_with_tools(self, tools: List[Tool], tool_mode: str = "any", cache_config: Optional[CacheConfig] = None) -> Dict:
         """Get configuration with tools added.
         
         Args:
             tools: List of tools to add to configuration
             tool_mode: Mode for tool calling - "any" or "auto" (default: "any")
+            cache_config: Optional cache configuration
             
         Returns:
             Dict: Configuration with tools added
         """
         config = self.default_config.copy()
+        if cache_config:
+            config["cached_content"] = cache_config.cache_name
         
         # If no tools are provided, force tool_mode to "auto"
         if not tools:
             tool_mode = "auto"
             config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
+            
             return config
             
         config["tools"] = [types.Tool(function_declarations=[tool.function_definition for tool in tools])]
         config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
+        
         return config
 
     async def _get_gemini_response(self, messages: List[Dict], config: Dict, model: str) -> Optional[Any]:
@@ -201,7 +209,8 @@ class GeminiClient:
         tool_executor: ToolExecutor,
         max_iterations: int = 10,
         num_gemini_call_retries: int = 1,
-        tool_mode: str = "any"
+        tool_mode: str = "any",
+        cache_config: Optional[CacheConfig] = None
     ) -> AsyncGenerator[str, None]:
         """Process a query using Gemini and available tools, streaming responses.
 
@@ -213,6 +222,7 @@ class GeminiClient:
             max_iterations: Maximum number of iterations to prevent infinite loops (default: 10)
             num_gemini_call_retries: Number of retries to attempt on Gemini API calls (default: 1)
             tool_mode: Mode for tool calling - "any" or "auto" (default: "any")
+            cache_config: Optional cache configuration for using cached content
 
         Yields:
             str: Stream of text responses
@@ -222,8 +232,17 @@ class GeminiClient:
             GeminiResponseError: If the response is invalid or empty
             GeminiToolExecutionError: If tool execution fails
         """
+        # Handle cache refresh if needed
+        if cache_config:
+            if cache_config.auto_refresh_ttl:
+                # Refresh the cache with new TTL
+                await self.cache_manager.get_and_refresh(cache_config.cache_name, cache_config.auto_refresh_ttl)
+            else:
+                # Just verify the cache exists
+                await self.cache_manager.get_cache(cache_config.cache_name)
+
         # Get config with tools
-        config = self._get_config_with_tools(tools, tool_mode)
+        config = self._get_config_with_tools(tools, tool_mode, cache_config)
 
         # Initialize messages
         messages = [types.Content(role="user", parts=[types.Part(text=query)])]

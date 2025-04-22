@@ -297,28 +297,123 @@ async for response in client.chat(
 
 ### Context Caching
 
-We're working on implementing context caching to improve performance and reduce costs. This feature will allow you to:
+We've implemented context caching to improve performance and reduce costs. This feature allows you to:
 
 - Cache input tokens for repeated use
 - Reduce costs for frequently used prompts
 - Improve response times for similar queries
 - Set custom TTL (Time To Live) for cached content
+- Automatically refresh cache TTL when needed
 
-Example usage (coming soon):
+#### Cache Configuration
+
+The caching system is highly configurable through the `CacheConfig` class:
+
 ```python
-# Create a cache with custom TTL
-cache = client.create_cache(
-    model="gemini-pro",
-    content=system_instructions,
-    ttl="1h"  # Cache for 1 hour
+from blockmind.gemini import CacheConfig
+
+# Basic cache usage
+cache_config = CacheConfig(
+    cache_name="my_cache",
+    auto_refresh_ttl=None  # No automatic refresh
 )
 
-# Use cached content in subsequent requests
-response = await client.chat(
-    query="What's the weather?",
-    model="gemini-pro",
-    cached_content=cache.name
+# Cache with automatic TTL refresh
+cache_config = CacheConfig(
+    cache_name="my_cache",
+    auto_refresh_ttl="1h"  # Refresh TTL to 1 hour on each use
 )
 ```
+
+#### Cache Management
+
+The `CacheManager` provides a complete interface for cache operations:
+
+```python
+from blockmind.gemini import GeminiClient, CacheManager
+
+# Initialize client and cache manager
+client = GeminiClient(api_key="your-api-key")
+cache_manager = client.cache_manager
+
+# Create a new cache
+cache_name = cache_manager.create_cache(
+    model="gemini-pro",
+    content="You are a helpful assistant.",
+    ttl="1h",
+    cache_name="my_cache"  # Optional custom name
+)
+
+# List all caches
+caches = cache_manager.list_caches()
+
+# Get cache details
+cache = cache_manager.get_cache(cache_name)
+
+# Update cache TTL
+cache_manager.update_cache_ttl(cache_name, "2h")
+
+# Delete a cache
+cache_manager.delete_cache(cache_name)
+```
+
+#### Using Cached Content
+
+You can use cached content in your chat requests:
+
+```python
+# Basic chat with cached content
+async for response in client.chat(
+    query="What's the weather?",
+    model="gemini-pro",
+    tools=[weather_tool],
+    tool_executor=tool_executor,
+    cache_config=CacheConfig(
+        cache_name="weather_cache",
+        auto_refresh_ttl="1h"
+    )
+):
+    print(response)
+```
+
+#### Use Cases
+
+1. **Chatbots with System Instructions**
+   - Cache your system instructions to reduce token costs
+   - Automatically refresh TTL to keep instructions active
+
+2. **Document Analysis**
+   - Cache large documents for repeated analysis
+   - Use different caches for different document types
+
+3. **Code Repository Analysis**
+   - Cache repository context for multiple queries
+   - Refresh TTL based on repository update frequency
+
+4. **Video Analysis**
+   - Cache video content for multiple analysis requests
+   - Use longer TTL for frequently accessed videos
+
+#### Best Practices
+
+1. **Cache Naming**
+   - Use descriptive names for your caches
+   - Include model and content type in the name
+   - Example: `weather_gemini_pro_cache`
+
+2. **TTL Management**
+   - Set appropriate TTL based on content update frequency
+   - Use auto_refresh_ttl for frequently accessed caches
+   - Consider content expiration needs
+
+3. **Cache Cleanup**
+   - Regularly clean up unused caches
+   - Monitor cache usage and adjust TTL accordingly
+   - Implement cache rotation for large applications
+
+4. **Error Handling**
+   - Always verify cache existence before use
+   - Handle cache creation/deletion errors gracefully
+   - Implement fallback for cache failures
 
 For more details, see the [Gemini API Caching Documentation](https://ai.google.dev/gemini-api/docs/caching?lang=python). 
