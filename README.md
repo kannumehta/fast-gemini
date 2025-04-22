@@ -52,24 +52,21 @@ from fast_gemini import Tool
 from typing import Dict
 
 class SimpleTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="simple_tool",
-            function_definition={
-                "name": "simple_tool",
-                "description": "A simple tool example",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "input": {
-                            "type": "string",
-                            "description": "Input parameter"
-                        }
-                    },
-                    "required": ["input"]
+    name: str = "simple_tool"
+    function_definition: Dict = {
+        "name": "simple_tool",
+        "description": "A simple tool example",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Input parameter"
                 }
-            }
-        )
+            },
+            "required": ["input"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         # Your tool logic here
@@ -146,24 +143,21 @@ from typing import Dict
 
 # Define a custom tool
 class CalculatorTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="calculate",
-            function_definition={
-                "name": "calculate",
-                "description": "Perform mathematical calculations",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "expression": {
-                            "type": "string",
-                            "description": "The mathematical expression to evaluate"
-                        }
-                    },
-                    "required": ["expression"]
+    name: str = "calculate"
+    function_definition: Dict = {
+        "name": "calculate",
+        "description": "Perform mathematical calculations",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "The mathematical expression to evaluate"
                 }
-            }
-        )
+            },
+            "required": ["expression"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         expression = tool_args["expression"]
@@ -175,24 +169,21 @@ class CalculatorTool(Tool):
 
 # Define another tool
 class TimeTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="get_time",
-            function_definition={
-                "name": "get_time",
-                "description": "Get the current time in a specific timezone",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "timezone": {
-                            "type": "string",
-                            "description": "The timezone to get time for"
-                        }
-                    },
-                    "required": ["timezone"]
+    name: str = "get_time"
+    function_definition: Dict = {
+        "name": "get_time",
+        "description": "Get the current time in a specific timezone",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timezone": {
+                    "type": "string",
+                    "description": "The timezone to get time for"
                 }
-            }
-        )
+            },
+            "required": ["timezone"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         timezone = tool_args["timezone"]

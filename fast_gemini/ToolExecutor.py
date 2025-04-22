@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List
 from .FunctionCall import FunctionCall
 from .ToolsExecutionResult import ToolsExecutionResult
+from pydantic import BaseModel
 
-class ToolExecutor(ABC):
+class ToolExecutor(BaseModel, ABC):
     @abstractmethod
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
         """
