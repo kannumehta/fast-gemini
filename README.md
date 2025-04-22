@@ -291,4 +291,34 @@ async for response in client.chat(
 4. Use type hints for better code maintainability
 5. Consider implementing rate limiting for API calls
 6. Cache tool results when appropriate
-7. Implement proper logging for debugging 
+7. Implement proper logging for debugging
+
+## Coming Soon
+
+### Context Caching
+
+We're working on implementing context caching to improve performance and reduce costs. This feature will allow you to:
+
+- Cache input tokens for repeated use
+- Reduce costs for frequently used prompts
+- Improve response times for similar queries
+- Set custom TTL (Time To Live) for cached content
+
+Example usage (coming soon):
+```python
+# Create a cache with custom TTL
+cache = client.create_cache(
+    model="gemini-pro",
+    content=system_instructions,
+    ttl="1h"  # Cache for 1 hour
+)
+
+# Use cached content in subsequent requests
+response = await client.chat(
+    query="What's the weather?",
+    model="gemini-pro",
+    cached_content=cache.name
+)
+```
+
+For more details, see the [Gemini API Caching Documentation](https://ai.google.dev/gemini-api/docs/caching?lang=python). 
