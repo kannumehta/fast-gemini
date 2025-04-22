@@ -1,25 +1,20 @@
+Metadata-Version: 2.4
+Name: fast_gemini
+Version: 0.1.0
+Summary: A Python client for Google's Gemini API
+Author: Fast Gemini
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: google-genai>=0.1.0
+Requires-Dist: genai>=0.1.0
+
 # Gemini Integration
 
 This package provides a Python integration with Google's Gemini API, allowing for advanced AI interactions with tool execution capabilities. The integration supports asynchronous operations, tool execution, and streaming responses.
-
-## Installation
-
-You can install the package locally using pip:
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/gemini.git
-cd gemini
-
-# Install in development mode
-pip install -e .
-```
-
-Or install directly from the repository:
-
-```bash
-pip install git+https://github.com/yourusername/gemini.git
-```
 
 ## Core Components
 
@@ -28,7 +23,7 @@ pip install git+https://github.com/yourusername/gemini.git
 The main client for interacting with the Gemini API. It handles message processing, tool execution, and response streaming.
 
 ```python
-from fast_gemini import GeminiClient
+from blockmind.gemini import GeminiClient
 
 # Initialize the client
 client = GeminiClient(api_key="your-api-key")
@@ -48,7 +43,7 @@ async for response in client.chat(
 Base class for creating custom tools that can be used with Gemini. Tools must implement the `execute` method.
 
 ```python
-from fast_gemini import Tool
+from blockmind.gemini import Tool
 from typing import Dict
 
 class SimpleTool(Tool):
@@ -81,7 +76,7 @@ class SimpleTool(Tool):
 Abstract base class for executing tools. Implement this to define how tools should be executed.
 
 ```python
-from fast_gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
+from blockmind.gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
 
 class CustomToolExecutor(ToolExecutor):
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
@@ -98,7 +93,7 @@ class CustomToolExecutor(ToolExecutor):
 A concrete implementation of ToolExecutor that executes multiple tools concurrently using asyncio.
 
 ```python
-from fast_gemini import BatchToolExecutor
+from blockmind.gemini import BatchToolExecutor
 
 # Initialize the batch executor
 executor = BatchToolExecutor()
@@ -119,7 +114,7 @@ async for response in client.chat(
 A ToolExecutor that limits the number of concurrent tool executions by processing them in batches.
 
 ```python
-from fast_gemini import RateLimitingBatchExecutor
+from blockmind.gemini import RateLimitingBatchExecutor
 
 # Initialize with max batch size of 5
 executor = RateLimitingBatchExecutor(max_batch_size=5)
@@ -141,7 +136,7 @@ Here's a complete example showing how to use the Gemini integration with custom 
 
 ```python
 import asyncio
-from fast_gemini import GeminiClient, Tool, BatchToolExecutor
+from blockmind.gemini import GeminiClient, Tool, BatchToolExecutor
 from typing import Dict
 
 # Define a custom tool
@@ -327,7 +322,7 @@ We've implemented context caching to improve performance and reduce costs. This 
 The caching system is highly configurable through the `CacheConfig` class:
 
 ```python
-from fast_gemini import CacheConfig
+from blockmind.gemini import CacheConfig
 
 # Basic cache usage
 cache_config = CacheConfig(
@@ -347,7 +342,7 @@ cache_config = CacheConfig(
 The `CacheManager` provides a complete interface for cache operations:
 
 ```python
-from fast_gemini import GeminiClient, CacheManager
+from blockmind.gemini import GeminiClient, CacheManager
 
 # Initialize client and cache manager
 client = GeminiClient(api_key="your-api-key")

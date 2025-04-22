@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fast_gemini"
+version = "0.1.0"
+description = "A Python client for Google's Gemini API"
+readme = "README.md"
+authors = [
+    {name = "Fast Gemini"}
+]
+requires-python = ">=3.7"
+dependencies = [
+    "pydantic>=2.6.0",
+    "google-genai>=0.1.0",
+    "genai>=0.1.0"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools]
+packages = ["fast_gemini"] 
