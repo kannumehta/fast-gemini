@@ -293,9 +293,7 @@ async for response in client.chat(
 6. Cache tool results when appropriate
 7. Implement proper logging for debugging
 
-## Coming Soon
-
-### Context Caching
+## Context Caching
 
 We've implemented context caching to improve performance and reduce costs. This feature allows you to:
 
@@ -305,7 +303,7 @@ We've implemented context caching to improve performance and reduce costs. This 
 - Set custom TTL (Time To Live) for cached content
 - Automatically refresh cache TTL when needed
 
-#### Cache Configuration
+### Cache Configuration
 
 The caching system is highly configurable through the `CacheConfig` class:
 
@@ -325,7 +323,7 @@ cache_config = CacheConfig(
 )
 ```
 
-#### Cache Management
+### Cache Management
 
 The `CacheManager` provides a complete interface for cache operations:
 
@@ -357,7 +355,7 @@ cache_manager.update_cache_ttl(cache_name, "2h")
 cache_manager.delete_cache(cache_name)
 ```
 
-#### Using Cached Content
+### Using Cached Content
 
 You can use cached content in your chat requests:
 
@@ -376,7 +374,7 @@ async for response in client.chat(
     print(response)
 ```
 
-#### Use Cases
+### Use Cases
 
 1. **Chatbots with System Instructions**
    - Cache your system instructions to reduce token costs
@@ -394,7 +392,7 @@ async for response in client.chat(
    - Cache video content for multiple analysis requests
    - Use longer TTL for frequently accessed videos
 
-#### Best Practices
+### Best Practices
 
 1. **Cache Naming**
    - Use descriptive names for your caches
