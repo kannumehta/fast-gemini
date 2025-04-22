@@ -95,6 +95,27 @@ async for response in client.chat(
     print(response)
 ```
 
+### RateLimitingBatchExecutor
+
+A ToolExecutor that limits the number of concurrent tool executions by processing them in batches.
+
+```python
+from blockmind.gemini import RateLimitingBatchExecutor
+
+# Initialize with max batch size of 5
+executor = RateLimitingBatchExecutor(max_batch_size=5)
+
+# Use with GeminiClient
+client = GeminiClient(api_key="your-api-key")
+async for response in client.chat(
+    query="Process multiple items",
+    model="gemini-pro",
+    tools=[processing_tool],
+    tool_executor=executor
+):
+    print(response)
+```
+
 ## Complete Example
 
 Here's a complete example showing how to use the Gemini integration with custom tools:
