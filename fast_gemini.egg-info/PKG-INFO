@@ -16,6 +16,25 @@ Requires-Dist: genai>=0.1.0
 
 This package provides a Python integration with Google's Gemini API, allowing for advanced AI interactions with tool execution capabilities. The integration supports asynchronous operations, tool execution, and streaming responses.
 
+## Installation
+
+You can install the package locally using pip:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/gemini.git
+cd gemini
+
+# Install in development mode
+pip install -e .
+```
+
+Or install directly from the repository:
+
+```bash
+pip install git+https://github.com/yourusername/gemini.git
+```
+
 ## Core Components
 
 ### GeminiClient
@@ -23,7 +42,7 @@ This package provides a Python integration with Google's Gemini API, allowing fo
 The main client for interacting with the Gemini API. It handles message processing, tool execution, and response streaming.
 
 ```python
-from blockmind.gemini import GeminiClient
+from fast_gemini import GeminiClient
 
 # Initialize the client
 client = GeminiClient(api_key="your-api-key")
@@ -43,28 +62,25 @@ async for response in client.chat(
 Base class for creating custom tools that can be used with Gemini. Tools must implement the `execute` method.
 
 ```python
-from blockmind.gemini import Tool
+from fast_gemini import Tool
 from typing import Dict
 
 class SimpleTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="simple_tool",
-            function_definition={
-                "name": "simple_tool",
-                "description": "A simple tool example",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "input": {
-                            "type": "string",
-                            "description": "Input parameter"
-                        }
-                    },
-                    "required": ["input"]
+    name: str = "simple_tool"
+    function_definition: Dict = {
+        "name": "simple_tool",
+        "description": "A simple tool example",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Input parameter"
                 }
-            }
-        )
+            },
+            "required": ["input"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         # Your tool logic here
@@ -76,7 +92,7 @@ class SimpleTool(Tool):
 Abstract base class for executing tools. Implement this to define how tools should be executed.
 
 ```python
-from blockmind.gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
+from fast_gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
 
 class CustomToolExecutor(ToolExecutor):
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
@@ -93,7 +109,7 @@ class CustomToolExecutor(ToolExecutor):
 A concrete implementation of ToolExecutor that executes multiple tools concurrently using asyncio.
 
 ```python
-from blockmind.gemini import BatchToolExecutor
+from fast_gemini import BatchToolExecutor
 
 # Initialize the batch executor
 executor = BatchToolExecutor()
@@ -114,7 +130,7 @@ async for response in client.chat(
 A ToolExecutor that limits the number of concurrent tool executions by processing them in batches.
 
 ```python
-from blockmind.gemini import RateLimitingBatchExecutor
+from fast_gemini import RateLimitingBatchExecutor
 
 # Initialize with max batch size of 5
 executor = RateLimitingBatchExecutor(max_batch_size=5)
@@ -136,29 +152,26 @@ Here's a complete example showing how to use the Gemini integration with custom 
 
 ```python
 import asyncio
-from blockmind.gemini import GeminiClient, Tool, BatchToolExecutor
+from fast_gemini import GeminiClient, Tool, BatchToolExecutor
 from typing import Dict
 
 # Define a custom tool
 class CalculatorTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="calculate",
-            function_definition={
-                "name": "calculate",
-                "description": "Perform mathematical calculations",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "expression": {
-                            "type": "string",
-                            "description": "The mathematical expression to evaluate"
-                        }
-                    },
-                    "required": ["expression"]
+    name: str = "calculate"
+    function_definition: Dict = {
+        "name": "calculate",
+        "description": "Perform mathematical calculations",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "The mathematical expression to evaluate"
                 }
-            }
-        )
+            },
+            "required": ["expression"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         expression = tool_args["expression"]
@@ -170,24 +183,21 @@ class CalculatorTool(Tool):
 
 # Define another tool
 class TimeTool(Tool):
-    def __init__(self):
-        super().__init__(
-            name="get_time",
-            function_definition={
-                "name": "get_time",
-                "description": "Get the current time in a specific timezone",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "timezone": {
-                            "type": "string",
-                            "description": "The timezone to get time for"
-                        }
-                    },
-                    "required": ["timezone"]
+    name: str = "get_time"
+    function_definition: Dict = {
+        "name": "get_time",
+        "description": "Get the current time in a specific timezone",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timezone": {
+                    "type": "string",
+                    "description": "The timezone to get time for"
                 }
-            }
-        )
+            },
+            "required": ["timezone"]
+        }
+    }
 
     async def execute(self, tool_args: Dict) -> Dict:
         timezone = tool_args["timezone"]
@@ -322,7 +332,7 @@ We've implemented context caching to improve performance and reduce costs. This 
 The caching system is highly configurable through the `CacheConfig` class:
 
 ```python
-from blockmind.gemini import CacheConfig
+from fast_gemini import CacheConfig
 
 # Basic cache usage
 cache_config = CacheConfig(
@@ -342,7 +352,7 @@ cache_config = CacheConfig(
 The `CacheManager` provides a complete interface for cache operations:
 
 ```python
-from blockmind.gemini import GeminiClient, CacheManager
+from fast_gemini import GeminiClient, CacheManager
 
 # Initialize client and cache manager
 client = GeminiClient(api_key="your-api-key")

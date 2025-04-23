@@ -8,51 +8,21 @@ from .ToolExecutor import ToolExecutor
 from .ToolsExecutionResult import ToolsExecutionResult
 from .FunctionCall import FunctionCall
 from .exceptions import GeminiAPIError, GeminiResponseError, GeminiToolExecutionError, GeminiClientError
-from .CacheManager import CacheManager
 from .CacheConfig import CacheConfig
-
+from .session.ChatManager import ChatManager
+from .session.ChatMessage import ChatMessage
+from .session.GenerateContentRequest import GenerateContentRequest
 class GeminiClient:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, chat_manager: ChatManager):
         """Initialize the Gemini client with an API key.
         
         Args:
             api_key: The Gemini API key
         """
         self.client = genai.Client(api_key=api_key)
-        self.default_config = {
-            "automatic_function_calling": {"disable": True},
-            "tool_config": {"function_calling_config": {"mode": "any"}},
-        }
-        self.cache_manager = CacheManager(self.client)
+        self.chat_manager = chat_manager
 
-    def _get_config_with_tools(self, tools: List[Tool], tool_mode: str = "any", cache_config: Optional[CacheConfig] = None) -> Dict:
-        """Get configuration with tools added.
-        
-        Args:
-            tools: List of tools to add to configuration
-            tool_mode: Mode for tool calling - "any" or "auto" (default: "any")
-            cache_config: Optional cache configuration
-            
-        Returns:
-            Dict: Configuration with tools added
-        """
-        config = self.default_config.copy()
-        if cache_config:
-            config["cached_content"] = cache_config.cache_name
-        
-        # If no tools are provided, force tool_mode to "auto"
-        if not tools:
-            tool_mode = "auto"
-            config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
-            
-            return config
-            
-        config["tools"] = [types.Tool(function_declarations=[tool.function_definition for tool in tools])]
-        config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
-        
-        return config
-
-    async def _get_gemini_response(self, messages: List[Dict], config: Dict, model: str) -> Optional[Any]:
+    async def _get_gemini_response(self, model: str, generation_request: GenerateContentRequest) -> Optional[Any]:
         """Get response from Gemini API with error handling.
 
         Args:
@@ -70,8 +40,8 @@ class GeminiClient:
         try:
             response = await self.client.aio.models.generate_content(
                 model=model,
-                contents=messages,
-                config=config
+                contents=[c.to_content() for c in generation_request.contents],
+                config=generation_request.config
             )
 
             if not response or not response.candidates:
@@ -88,7 +58,7 @@ class GeminiClient:
         except Exception as e:
             raise GeminiAPIError("UNKNOWN", str(e))
 
-    async def _get_gemini_response_with_retry(self, messages: List[Dict], config: Dict, model: str, num_retries: int = 1) -> Optional[Any]:
+    async def _get_gemini_response_with_retry(self, model: str, generation_request: GenerateContentRequest, num_retries: int = 1) -> Optional[Any]:
         """Get response from Gemini API with retries on failure.
 
         Args:
@@ -102,7 +72,7 @@ class GeminiClient:
         """
         for attempt in range(num_retries + 1):
             try:
-                return await self._get_gemini_response(messages, config, model)
+                return await self._get_gemini_response(model, generation_request)
             except GeminiAPIError:
                 if attempt < num_retries:
                     await asyncio.sleep(1)  # Wait 1 second before retry
@@ -180,25 +150,22 @@ class GeminiClient:
             ))
         return tool_calls
 
-    async def _update_messages(self, messages: List[Dict], execution_result: ToolsExecutionResult) -> None:
+    async def _update_generation_request(self, generation_request: GenerateContentRequest, execution_result: ToolsExecutionResult) -> None:
         """Update messages with function call results.
         
         Args:
-            messages: Current message history
+            generation_request: Current generation request
             execution_result: Results from tool execution
         """
         for result in execution_result.function_call_results:
             # Append the function call
-            messages.append(types.Content(
-                role="model",
-                parts=[types.Part(function_call=result.function_call.function_call)]
+            generation_request.contents.append(ChatMessage.from_function_call(
+                tool_name=result.function_call.tool.name,
+                tool_args=result.function_call.function_call.args
             ))
-            messages.append(types.Content(
-                role="user",
-                parts=[types.Part.from_function_response(
-                    name=result.function_call.tool.name,
-                    response={"result": result.result}
-                )]
+            generation_request.contents.append(ChatMessage.from_function_result(
+                tool_name=result.function_call.tool.name,
+                tool_result=result.result
             ))
 
     async def chat(
@@ -232,20 +199,15 @@ class GeminiClient:
             GeminiResponseError: If the response is invalid or empty
             GeminiToolExecutionError: If tool execution fails
         """
-        # Handle cache refresh if needed
-        if cache_config:
-            if cache_config.auto_refresh_ttl:
-                # Refresh the cache with new TTL
-                await self.cache_manager.get_and_refresh(cache_config.cache_name, cache_config.auto_refresh_ttl)
-            else:
-                # Just verify the cache exists
-                await self.cache_manager.get_cache(cache_config.cache_name)
-
-        # Get config with tools
-        config = self._get_config_with_tools(tools, tool_mode, cache_config)
-
-        # Initialize messages
-        messages = [types.Content(role="user", parts=[types.Part(text=query)])]
+        generation_request = await self.chat_manager.generate_content_request(
+            chat_id="1",
+            query=query,
+            model=model,
+            client=self.client,
+            tools=tools,
+            tool_mode=tool_mode,
+            cache_config=cache_config
+        )
 
         # Process response and handle tool calls
         iteration = 0
@@ -254,7 +216,7 @@ class GeminiClient:
             iteration += 1
 
             # Get response from Gemini
-            response = await self._get_gemini_response_with_retry(messages, config, model, num_gemini_call_retries)
+            response = await self._get_gemini_response_with_retry(model, generation_request, num_gemini_call_retries)
             if response is None:
                 raise GeminiResponseError("No response generated")
 
@@ -276,7 +238,7 @@ class GeminiClient:
                 break
 
             # Update messages with results
-            await self._update_messages(messages, execution_result)
+            await self._update_generation_request(generation_request, execution_result)
 
         if iteration >= max_iterations:
-            yield "\n[Warning: Maximum iterations reached. Stopping to prevent infinite loop.]"
+            yield "Maximum tool iterations reached."

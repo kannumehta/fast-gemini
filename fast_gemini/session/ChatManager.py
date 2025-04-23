@@ -1,0 +1,73 @@
+from pydantic import BaseModel
+from typing import List, Dict, Optional, ClassVar
+from ..CacheManager import CacheManager
+from .ChatStorage import ChatStorage
+from .ChatMessage import ChatMessage
+from .GenerateContentRequest import GenerateContentRequest
+from ..CacheConfig import CacheConfig
+from google import genai
+from google.genai import types
+from ..Tool import Tool
+
+class ChatManager(BaseModel):
+    system_prompt: str
+    chat_storage: ChatStorage
+    cache_manager: CacheManager
+    default_config: ClassVar[Dict] = {
+        "automatic_function_calling": {"disable": True},
+        "tool_config": {"function_calling_config": {"mode": "auto"}},
+    }
+
+    async def generate_content_request(
+        self,
+        chat_id: str,
+        model: str,
+        client: genai.Client,
+        query: str,
+        tools: List[Tool] = [],
+        tool_mode: str = "auto",
+        cache_config: Optional[CacheConfig] = None,
+    ) -> GenerateContentRequest:
+        # Prepare the config with context cache and tools.
+        config = self.default_config.copy()
+        if cache_config:
+            config = await self.__get_config_with_cache(model, client, cache_config)
+        config = await self.__get_config_with_tools(config, tools, tool_mode)
+
+        # If the there is already a conversation history, just append the query to it.
+        messages = await self.chat_storage.get_history(chat_id)
+        if messages:
+            messages.append(ChatMessage.from_user_query(query))
+        else:
+            messages = [ChatMessage.from_user_query(self.__create_prompt_with_query(query))]
+
+        return GenerateContentRequest(
+            contents=messages,
+            config=config
+        )
+    
+    async def __get_config_with_cache(self, model: str, client: genai.Client, cache_config: CacheConfig) -> Dict:
+        config = self.default_config.copy()
+        if cache_config.auto_manage_cache:
+            cache_name = await self.cache_manager.create_or_update_cache(
+                client=client,
+                model=model,
+                content=self.system_prompt,
+                ttl=cache_config.ttl,
+                cache_name=cache_config.cache_name,
+            )
+        config["cached_content"] = cache_name
+        return config
+    
+    async def __get_config_with_tools(self, config: Dict, tools: List[Tool], tool_mode: str = "auto") -> Dict:
+        config["tools"] = [types.Tool(function_declarations=[tool.function_definition for tool in tools])]
+        if not tools:
+            tool_mode = "auto"
+        config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
+        return config
+    
+    def __create_prompt_with_query(self, query: str) -> str:
+        return f"""{self.system_prompt}
+
+CURRENT TASK:
+<user_query>{query}</user_query>"""
