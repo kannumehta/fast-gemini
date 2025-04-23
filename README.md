@@ -75,19 +75,86 @@ class SimpleTool(Tool):
 
 ### ToolExecutor
 
-Abstract base class for executing tools. Implement this to define how tools should be executed.
+Abstract base class for executing tools. Implement this to define how tools should be executed. The ToolExecutor supports generic event streaming, allowing you to emit typed events during tool execution.
 
 ```python
 from fast_gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
+from typing import List, TypeVar, Generic
+from pydantic import BaseModel
 
-class CustomToolExecutor(ToolExecutor):
+# Define your event type
+class ToolEvent(BaseModel):
+    type: str
+    message: str
+    data: dict
+
+# Create a generic ToolExecutor with your event type
+class CustomToolExecutor(ToolExecutor[ToolEvent]):
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
-        # Implement custom execution logic
+        # Emit a progress event
+        await self._emit_event(ToolEvent(
+            type="progress",
+            message="Starting tool execution",
+            data={"total_tools": len(function_calls)}
+        ))
+        
         results = []
-        for call in function_calls:
+        for i, call in enumerate(function_calls):
+            # Emit progress for each tool
+            await self._emit_event(ToolEvent(
+                type="progress",
+                message=f"Executing tool {i+1}/{len(function_calls)}",
+                data={"tool_name": call.tool.name}
+            ))
+            
+            # Execute the tool
             result = await call.tool.execute(call.function_call.args)
             results.append(result)
+            
+            # Emit result event
+            await self._emit_event(ToolEvent(
+                type="result",
+                message=f"Tool {call.tool.name} completed",
+                data={"result": result}
+            ))
+        
         return ToolsExecutionResult(should_proceed=True, function_call_results=results)
+```
+
+### Event Streaming
+
+The ToolExecutor provides a powerful event streaming system that allows you to:
+- Emit typed events during tool execution
+- Stream progress updates, results, and errors
+- Handle events in a type-safe manner
+- Process events asynchronously
+
+Here's how to use the event streaming in your application:
+
+```python
+async def main():
+    # Initialize the executor with your event type
+    executor = CustomToolExecutor()
+    
+    try:
+        # Start tool execution
+        result = await executor.execute_tools(function_calls)
+        
+        # Get the event stream
+        stream = executor.get_result_stream()
+        
+        # Process events as they arrive
+        async for event in stream:
+            if event.type == "progress":
+                print(f"Progress: {event.message}")
+                # Update UI or log progress
+            elif event.type == "result":
+                print(f"Result: {event.message}")
+                # Process tool results
+                
+    finally:
+        # Clean up resources
+        await executor.shutdown()
 ```
 
 ### BatchToolExecutor
@@ -97,8 +164,8 @@ A concrete implementation of ToolExecutor that executes multiple tools concurren
 ```python
 from fast_gemini import BatchToolExecutor
 
-# Initialize the batch executor
-executor = BatchToolExecutor()
+# Initialize the batch executor with your event type
+executor = BatchToolExecutor[ToolEvent]()
 
 # Use with GeminiClient
 client = GeminiClient(api_key="your-api-key")
@@ -118,8 +185,8 @@ A ToolExecutor that limits the number of concurrent tool executions by processin
 ```python
 from fast_gemini import RateLimitingBatchExecutor
 
-# Initialize with max batch size of 5
-executor = RateLimitingBatchExecutor(max_batch_size=5)
+# Initialize with max batch size of 5 and your event type
+executor = RateLimitingBatchExecutor[ToolEvent](max_batch_size=5)
 
 # Use with GeminiClient
 client = GeminiClient(api_key="your-api-key")
@@ -134,12 +201,19 @@ async for response in client.chat(
 
 ## Complete Example
 
-Here's a complete example showing how to use the Gemini integration with custom tools:
+Here's a complete example showing how to use the Gemini integration with custom tools and event streaming:
 
 ```python
 import asyncio
 from fast_gemini import GeminiClient, Tool, BatchToolExecutor
 from typing import Dict
+from pydantic import BaseModel
+
+# Define your event type
+class ToolEvent(BaseModel):
+    type: str
+    message: str
+    data: dict
 
 # Define a custom tool
 class CalculatorTool(Tool):
@@ -167,44 +241,52 @@ class CalculatorTool(Tool):
         except Exception as e:
             return {"error": str(e)}
 
-# Define another tool
-class TimeTool(Tool):
-    name: str = "get_time"
-    function_definition: Dict = {
-        "name": "get_time",
-        "description": "Get the current time in a specific timezone",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "timezone": {
-                    "type": "string",
-                    "description": "The timezone to get time for"
-                }
-            },
-            "required": ["timezone"]
-        }
-    }
-
-    async def execute(self, tool_args: Dict) -> Dict:
-        timezone = tool_args["timezone"]
-        # Implement timezone conversion logic here
-        return {"time": "12:00 PM", "timezone": timezone}
+# Custom executor with event streaming
+class StreamingCalculatorExecutor(BatchToolExecutor[ToolEvent]):
+    async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
+        # Emit start event
+        await self._emit_event(ToolEvent(
+            type="start",
+            message="Starting calculations",
+            data={"total": len(function_calls)}
+        ))
+        
+        # Execute tools
+        results = await super().execute_tools(function_calls)
+        
+        # Emit completion event
+        await self._emit_event(ToolEvent(
+            type="complete",
+            message="All calculations completed",
+            data={"results": results.function_call_results}
+        ))
+        
+        return results
 
 async def main():
     # Initialize components
     client = GeminiClient(api_key="your-api-key")
     calculator_tool = CalculatorTool()
-    time_tool = TimeTool()
-    executor = BatchToolExecutor()
+    executor = StreamingCalculatorExecutor()
 
-    # Use the client with multiple tools
+    # Use the client with event streaming
     async for response in client.chat(
-        query="What's 2 + 2 and what time is it in New York?",
+        query="Calculate 2 + 2 and 3 * 3",
         model="gemini-pro",
-        tools=[calculator_tool, time_tool],
+        tools=[calculator_tool],
         tool_executor=executor
     ):
         print(response)
+        
+    # Process events
+    stream = executor.get_result_stream()
+    async for event in stream:
+        if event.type == "start":
+            print(f"Starting {event.data['total']} calculations")
+        elif event.type == "complete":
+            print("All calculations completed")
+            for result in event.data["results"]:
+                print(f"Result: {result}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -214,6 +296,7 @@ if __name__ == "__main__":
 
 - Asynchronous operation support
 - Tool execution with concurrent processing
+- Generic event streaming with type safety
 - Streaming responses
 - Error handling and retries
 - Configurable tool execution modes
@@ -302,6 +385,9 @@ async for response in client.chat(
 5. Consider implementing rate limiting for API calls
 6. Cache tool results when appropriate
 7. Implement proper logging for debugging
+8. Use typed events for better type safety and IDE support
+9. Always call shutdown() to clean up resources
+10. Handle events asynchronously to avoid blocking
 
 ## Context Caching
 

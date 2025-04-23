@@ -68,7 +68,7 @@ class GeminiClient:
             GeminiResponseError: If the response is invalid or empty
         """
         try:
-            response = self.client.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=messages,
                 config=config

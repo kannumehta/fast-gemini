@@ -1,11 +1,13 @@
 import asyncio
-from typing import List
+from typing import List, TypeVar, Dict, Any
 from .ToolExecutor import ToolExecutor
 from .FunctionCall import FunctionCall
 from .FunctionCallResult import FunctionCallResult
 from .ToolsExecutionResult import ToolsExecutionResult
 
-class BatchToolExecutor(ToolExecutor):
+T = TypeVar('T')
+
+class BatchToolExecutor(ToolExecutor[T]):
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
         """
         Execute multiple function calls concurrently using asyncio tasks.

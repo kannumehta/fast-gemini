@@ -1,18 +1,21 @@
-from typing import List
+from typing import List, TypeVar
 from .ToolExecutor import ToolExecutor
 from .BatchToolExecutor import BatchToolExecutor
 from .FunctionCall import FunctionCall
 from .ToolsExecutionResult import ToolsExecutionResult
 
-class RateLimitingBatchExecutor(ToolExecutor):
+T = TypeVar('T')
+
+class RateLimitingBatchExecutor(ToolExecutor[T]):
     def __init__(self, max_batch_size: int):
         """Initialize the rate limiting batch executor.
         
         Args:
             max_batch_size: Maximum number of tools to execute in a single batch
         """
+        super().__init__()
         self.max_batch_size = max_batch_size
-        self.batch_executor = BatchToolExecutor()
+        self.batch_executor = BatchToolExecutor[T]()
 
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
         """Execute tools in batches of max_batch_size.
