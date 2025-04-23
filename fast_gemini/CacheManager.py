@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from google import genai
 from google.genai import types
 from .exceptions import GeminiAPIError
@@ -34,25 +34,29 @@ class CacheManager(BaseModel):
         except Exception as e:
             raise GeminiAPIError("CACHE_CREATE_ERROR", str(e))
 
-    def delete_cache(self, client: genai.Client, cache_name: str) -> None:
+    def delete_cache(self, client: genai.Client, cache_name: str) -> str:
         """Delete a cache by name.
         
         Args:
             cache_name: The name of the cache to delete
+            
+        Returns:
+            str: The name of the deleted cache
             
         Raises:
             GeminiAPIError: If cache deletion fails
         """
         try:
             client.caches.delete(cache_name)
+            return cache_name
         except Exception as e:
             raise GeminiAPIError("CACHE_DELETE_ERROR", str(e))
 
-    def list_caches(self, client: genai.Client) -> Dict[str, types.CachedContent]:
+    def list_caches(self, client: genai.Client) -> List[str]:
         """List all active caches.
         
         Returns:
-            Dict[str, types.CachedContent]: Dictionary of cache names to cache objects
+            List[str]: List of cache names
             
         Note:
             This returns metadata for all caches, including name, model, display_name,
@@ -60,21 +64,18 @@ class CacheManager(BaseModel):
             The actual cached content cannot be retrieved.
         """
         try:
-            caches = {}
-            for cache in client.caches.list():
-                caches[cache.name] = cache
-            return caches
+            return [cache.name for cache in client.caches.list()]
         except Exception as e:
             raise GeminiAPIError("CACHE_LIST_ERROR", str(e))
 
-    def get_cache(self, client: genai.Client, cache_name: str) -> Optional[types.CachedContent]:
+    def get_cache(self, client: genai.Client, cache_name: str) -> Optional[str]:
         """Get a cache by name.
         
         Args:
             cache_name: The name of the cache to get
             
         Returns:
-            Optional[types.CachedContent]: The cache object if found, None otherwise
+            Optional[str]: The cache name if found, None otherwise
             
         Note:
             This returns metadata for the cache, including name, model, display_name,
@@ -82,16 +83,20 @@ class CacheManager(BaseModel):
             The actual cached content cannot be retrieved.
         """
         try:
-            return client.caches.get(name=cache_name)
+            cache = client.caches.get(name=cache_name)
+            return cache.name if cache else None
         except Exception as e:
             raise GeminiAPIError("CACHE_GET_ERROR", str(e))
 
-    def update_cache_ttl(self, client: genai.Client, cache_name: str, ttl: str) -> None:
+    def update_cache_ttl(self, client: genai.Client, cache_name: str, ttl: str) -> str:
         """Update the TTL of a cache.
         
         Args:
             cache_name: The name of the cache to update
             ttl: New time to live for the cache
+            
+        Returns:
+            str: The name of the updated cache
             
         Raises:
             GeminiAPIError: If cache update fails
@@ -101,6 +106,7 @@ class CacheManager(BaseModel):
                 name=cache_name,
                 config=types.UpdateCachedContentConfig(ttl=ttl)
             )
+            return cache_name
         except Exception as e:
             raise GeminiAPIError("CACHE_UPDATE_ERROR", str(e))
 
@@ -126,15 +132,14 @@ class CacheManager(BaseModel):
             
             if existing_cache:
                 # Update existing cache
-                self.update_cache_ttl(client, display_name, ttl)
-                return display_name
+                return self.update_cache_ttl(client, display_name, ttl)
             else:
                 # Create new cache
                 return self.create_cache(client, model, content, ttl, display_name)
         except Exception as e:
             raise GeminiAPIError("CACHE_CREATE_OR_UPDATE_ERROR", str(e))
 
-    def get_and_refresh(self, client: genai.Client, cache_name: str, ttl: str) -> Optional[types.CachedContent]:
+    def get_and_refresh(self, client: genai.Client, cache_name: str, ttl: str) -> Optional[str]:
         """Get a cache by name and refresh its TTL if it exists.
         
         Args:
@@ -142,7 +147,7 @@ class CacheManager(BaseModel):
             ttl: New time to live for the cache
             
         Returns:
-            Optional[types.CachedContent]: The cache object if found, None otherwise
+            Optional[str]: The cache name if found and refreshed, None otherwise
             
         Raises:
             GeminiAPIError: If cache operations fail
@@ -150,7 +155,7 @@ class CacheManager(BaseModel):
         try:
             cache = self.get_cache(client, cache_name)
             if cache:
-                self.update_cache_ttl(cache_name, ttl)
-            return cache
+                return self.update_cache_ttl(client, cache_name, ttl)
+            return None
         except Exception as e:
             raise GeminiAPIError("CACHE_REFRESH_ERROR", str(e)) 

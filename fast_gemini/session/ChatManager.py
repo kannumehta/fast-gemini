@@ -36,7 +36,7 @@ class ChatManager(BaseModel):
 
         # If the there is already a conversation history, just append the query to it.
         messages = await self.chat_storage.get_history(chat_id)
-        if messages:
+        if messages or cache_config:
             messages.append(ChatMessage.from_user_query(query))
         else:
             messages = [ChatMessage.from_user_query(self.__create_prompt_with_query(query))]
@@ -48,6 +48,7 @@ class ChatManager(BaseModel):
     
     async def __get_config_with_cache(self, model: str, client: genai.Client, cache_config: CacheConfig) -> Dict:
         config = self.default_config.copy()
+        cache_name = None
         if cache_config.auto_manage_cache:
             cache_name = await self.cache_manager.create_or_update_cache(
                 client=client,
@@ -56,7 +57,14 @@ class ChatManager(BaseModel):
                 ttl=cache_config.ttl,
                 cache_name=cache_config.cache_name,
             )
-        config["cached_content"] = cache_name
+        elif cache_config.cache_name:
+            cache_name = await self.cache_manager.get_cache(client, cache_config.cache_name)
+        
+        if cache_config and not cache_name:
+            raise ValueError("Failed to obtain cache name despite having cache configuration")
+        
+        if cache_name:
+            config["cached_content"] = cache_name
         return config
     
     async def __get_config_with_tools(self, config: Dict, tools: List[Tool], tool_mode: str = "auto") -> Dict:
