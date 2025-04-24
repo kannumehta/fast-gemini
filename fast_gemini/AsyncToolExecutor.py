@@ -7,7 +7,7 @@ from .ToolsExecutionResult import ToolsExecutionResult
 
 T = TypeVar('T')
 
-class BatchToolExecutor(ToolExecutor[T]):
+class AsyncToolExecutor(ToolExecutor[T]):
     async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
         """
         Execute multiple function calls concurrently using asyncio tasks.

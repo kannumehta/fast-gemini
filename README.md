@@ -1,14 +1,25 @@
 # Gemini Integration
 
-This package provides a Python integration with Google's Gemini API, allowing for advanced AI interactions with tool execution capabilities. The integration supports asynchronous operations, tool execution, and streaming responses.
+A powerful Python library for interacting with Google's Gemini API, providing advanced features like tool execution, session management, and context caching.
 
-## Installation
+## Features
 
-You can install the package locally using pip:
+- Asynchronous operation support
+- Tool execution with concurrent processing
+- Generic event streaming with type safety
+- Streaming responses
+- Error handling and retries
+- Configurable tool execution modes
+- Support for multiple tools
+- Type hints and validation
+- Session management with flexible storage backends
+- Context caching with automatic TTL refresh
+- Support for multiple storage implementations
+- Easy integration with various databases
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/gemini.git
+git clone https://github.com/kannumehta/fast-gemini.git
 cd gemini
 
 # Install in development mode
@@ -18,7 +29,7 @@ pip install -e .
 Or install directly from the repository:
 
 ```bash
-pip install git+https://github.com/yourusername/gemini.git
+pip install git+https://github.com/kannumehta/fast-gemini.git
 ```
 
 ## Core Components
@@ -28,10 +39,12 @@ pip install git+https://github.com/yourusername/gemini.git
 The main client for interacting with the Gemini API. It handles message processing, tool execution, and response streaming.
 
 ```python
-from fast_gemini import GeminiClient
+from fast_gemini import GeminiClient, ChatManager, LocalChatStorage
+from pydantic import BaseModel
 
-# Initialize the client
-client = GeminiClient(api_key="your-api-key")
+# Initialize the client with a chat manager
+chat_manager = ChatManager(storage=LocalChatStorage())
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 
 # Basic chat with tools
 async for response in client.chat(
@@ -50,6 +63,7 @@ Base class for creating custom tools that can be used with Gemini. Tools must im
 ```python
 from fast_gemini import Tool
 from typing import Dict
+from pydantic import BaseModel
 
 class SimpleTool(Tool):
     name: str = "simple_tool"
@@ -132,6 +146,16 @@ The ToolExecutor provides a powerful event streaming system that allows you to:
 Here's how to use the event streaming in your application:
 
 ```python
+from fast_gemini import ToolExecutor, FunctionCall, ToolsExecutionResult
+from typing import List
+from pydantic import BaseModel
+
+# Define your event type
+class ToolEvent(BaseModel):
+    type: str
+    message: str
+    data: dict
+
 async def main():
     # Initialize the executor with your event type
     executor = CustomToolExecutor()
@@ -157,18 +181,19 @@ async def main():
         await executor.shutdown()
 ```
 
-### BatchToolExecutor
+### AsyncToolExecutor
 
 A concrete implementation of ToolExecutor that executes multiple tools concurrently using asyncio.
 
 ```python
-from fast_gemini import BatchToolExecutor
+from fast_gemini import AsyncToolExecutor
+from pydantic import BaseModel
 
-# Initialize the batch executor with your event type
-executor = BatchToolExecutor[ToolEvent]()
+# Initialize the async executor with your event type
+executor = AsyncToolExecutor[ToolEvent]()
 
 # Use with GeminiClient
-client = GeminiClient(api_key="your-api-key")
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 async for response in client.chat(
     query="What's the weather in multiple cities?",
     model="gemini-pro",
@@ -178,18 +203,19 @@ async for response in client.chat(
     print(response)
 ```
 
-### RateLimitingBatchExecutor
+### RateLimitingAsyncExecutor
 
 A ToolExecutor that limits the number of concurrent tool executions by processing them in batches.
 
 ```python
-from fast_gemini import RateLimitingBatchExecutor
+from fast_gemini import RateLimitingAsyncExecutor
+from pydantic import BaseModel
 
 # Initialize with max batch size of 5 and your event type
-executor = RateLimitingBatchExecutor[ToolEvent](max_batch_size=5)
+executor = RateLimitingAsyncExecutor[ToolEvent](max_batch_size=5)
 
 # Use with GeminiClient
-client = GeminiClient(api_key="your-api-key")
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 async for response in client.chat(
     query="Process multiple items",
     model="gemini-pro",
@@ -199,109 +225,243 @@ async for response in client.chat(
     print(response)
 ```
 
-## Complete Example
+### Session Management
 
-Here's a complete example showing how to use the Gemini integration with custom tools and event streaming:
+FastGemini provides robust session management through the `ChatManager` and `ChatStorage` components:
+
+#### ChatManager
+
+Manages the conversation state and handles message generation requests:
+
+```python
+from fast_gemini import ChatManager, LocalChatStorage
+from pydantic import BaseModel
+
+# Initialize with a storage backend
+chat_manager = ChatManager(storage=LocalChatStorage())
+
+# Generate a content request
+generation_request = await chat_manager.generate_content_request(
+    chat_id="1",
+    query="What's the weather?",
+    model="gemini-pro",
+    client=client,
+    tools=tools,
+    tool_mode="any",
+    cache_config=cache_config
+)
+```
+
+#### ChatStorage
+
+Abstract base class for implementing different storage backends. You can create custom storage implementations for various databases:
+
+```python
+from fast_gemini import ChatStorage, ChatMessage
+from typing import List, Any
+from pydantic import BaseModel
+
+class RedisChatStorage(ChatStorage):
+    redis_client: Any  # Type hint for Redis client
+
+    def __init__(self, redis_client: Any):
+        super().__init__(redis_client=redis_client)
+
+    async def get_history(self, chat_id: str) -> List[ChatMessage]:
+        # Implement Redis-specific storage logic
+        pass
+
+    async def update_history(self, chat_id: str, messages: List[ChatMessage]) -> None:
+        # Implement Redis-specific update logic
+        pass
+
+    async def append_history(self, chat_id: str, messages: List[ChatMessage]) -> None:
+        # Implement Redis-specific append logic
+        pass
+
+# Example usage with Redis
+import redis
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+chat_manager = ChatManager(storage=RedisChatStorage(redis_client=redis_client))
+```
+
+### Context Caching
+
+FastGemini includes a powerful caching system to improve performance and reduce costs:
+
+#### CacheManager
+
+Manages the creation, updating, and deletion of cached content:
+
+```python
+from fast_gemini import CacheManager, CacheConfig
+from pydantic import BaseModel
+
+# Initialize cache manager
+cache_manager = CacheManager()
+
+# Create a new cache
+cache_name = await cache_manager.create_cache(
+    client=client,
+    model="gemini-pro",
+    content="You are a helpful assistant.",
+    ttl="1h",
+    cache_name="my_cache"
+)
+
+# Update cache TTL
+await cache_manager.update_cache_ttl(client, cache_name, "2h")
+
+# Get and refresh cache
+refreshed_cache = await cache_manager.get_and_refresh(client, cache_name, "1h")
+```
+
+#### CacheConfig
+
+Configure caching behavior for your chat sessions:
+
+```python
+from fast_gemini import CacheConfig
+from pydantic import BaseModel
+
+# Basic cache configuration
+cache_config = CacheConfig(
+    cache_name="my_cache",
+    auto_refresh_ttl="1h"  # Automatically refresh TTL on each use
+)
+
+# Use with chat
+async for response in client.chat(
+    query="What's the weather?",
+    model="gemini-pro",
+    tools=[weather_tool],
+    tool_executor=tool_executor,
+    cache_config=cache_config
+):
+    print(response)
+```
+
+### Storage Implementations
+
+FastGemini supports various storage backends through the `ChatStorage` interface:
+
+#### LocalChatStorage
+
+Simple in-memory storage for development and testing:
+
+```python
+from fast_gemini import LocalChatStorage
+from pydantic import BaseModel
+
+chat_manager = ChatManager(storage=LocalChatStorage())
+```
+
+#### Database-backed Storage
+
+Example implementations for different databases:
+
+```python
+# PostgreSQL Storage
+class PostgresChatStorage(ChatStorage):
+    connection_string: str
+
+    def __init__(self, connection_string: str):
+        super().__init__(connection_string=connection_string)
+        self.conn = psycopg2.connect(connection_string)
+
+    async def get_history(self, chat_id: str) -> List[ChatMessage]:
+        # Implement PostgreSQL-specific storage logic
+        pass
+
+# MongoDB Storage
+class MongoChatStorage(ChatStorage):
+    mongo_client: Any  # Type hint for MongoDB client
+
+    def __init__(self, mongo_client: Any):
+        super().__init__(mongo_client=mongo_client)
+        self.db = mongo_client.chat_db
+
+    async def get_history(self, chat_id: str) -> List[ChatMessage]:
+        # Implement MongoDB-specific storage logic
+        pass
+
+# Combined Storage
+class HybridChatStorage(ChatStorage):
+    redis_client: Any  # Type hint for Redis client
+    mongo_client: Any  # Type hint for MongoDB client
+
+    def __init__(self, redis_client: Any, mongo_client: Any):
+        super().__init__(redis_client=redis_client, mongo_client=mongo_client)
+        self.redis = redis_client
+        self.mongo = mongo_client
+
+    async def get_history(self, chat_id: str) -> List[ChatMessage]:
+        # Implement hybrid storage logic
+        pass
+```
+
+### Complete Example with All Features
+
+Here's a complete example showing how to use all FastGemini features together:
 
 ```python
 import asyncio
-from fast_gemini import GeminiClient, Tool, BatchToolExecutor
-from typing import Dict
+from fast_gemini import (
+    GeminiClient, ChatManager, LocalChatStorage,
+    AsyncToolExecutor, CacheConfig, Tool
+)
+from typing import Dict, Any
 from pydantic import BaseModel
 
-# Define your event type
-class ToolEvent(BaseModel):
-    type: str
-    message: str
-    data: dict
-
 # Define a custom tool
-class CalculatorTool(Tool):
-    name: str = "calculate"
+class WeatherTool(Tool):
+    name: str = "get_weather"
     function_definition: Dict = {
-        "name": "calculate",
-        "description": "Perform mathematical calculations",
+        "name": "get_weather",
+        "description": "Get weather information for a location",
         "parameters": {
             "type": "object",
             "properties": {
-                "expression": {
+                "location": {
                     "type": "string",
-                    "description": "The mathematical expression to evaluate"
+                    "description": "The location to get weather for"
                 }
             },
-            "required": ["expression"]
+            "required": ["location"]
         }
     }
 
     async def execute(self, tool_args: Dict) -> Dict:
-        expression = tool_args["expression"]
-        try:
-            result = eval(expression)
-            return {"result": result}
-        except Exception as e:
-            return {"error": str(e)}
-
-# Custom executor with event streaming
-class StreamingCalculatorExecutor(BatchToolExecutor[ToolEvent]):
-    async def execute_tools(self, function_calls: List[FunctionCall]) -> ToolsExecutionResult:
-        # Emit start event
-        await self._emit_event(ToolEvent(
-            type="start",
-            message="Starting calculations",
-            data={"total": len(function_calls)}
-        ))
-        
-        # Execute tools
-        results = await super().execute_tools(function_calls)
-        
-        # Emit completion event
-        await self._emit_event(ToolEvent(
-            type="complete",
-            message="All calculations completed",
-            data={"results": results.function_call_results}
-        ))
-        
-        return results
+        location = tool_args["location"]
+        # Implement weather API call here
+        return {"temperature": "72°F", "condition": "Sunny"}
 
 async def main():
     # Initialize components
-    client = GeminiClient(api_key="your-api-key")
-    calculator_tool = CalculatorTool()
-    executor = StreamingCalculatorExecutor()
+    chat_manager = ChatManager(storage=LocalChatStorage())
+    client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
+    weather_tool = WeatherTool()
+    executor = AsyncToolExecutor[ToolEvent]()
 
-    # Use the client with event streaming
+    # Configure caching
+    cache_config = CacheConfig(
+        cache_name="weather_chat",
+        auto_refresh_ttl="1h"
+    )
+
+    # Use the client with all features
     async for response in client.chat(
-        query="Calculate 2 + 2 and 3 * 3",
+        query="What's the weather in New York?",
         model="gemini-pro",
-        tools=[calculator_tool],
-        tool_executor=executor
+        tools=[weather_tool],
+        tool_executor=executor,
+        cache_config=cache_config
     ):
         print(response)
-        
-    # Process events
-    stream = executor.get_result_stream()
-    async for event in stream:
-        if event.type == "start":
-            print(f"Starting {event.data['total']} calculations")
-        elif event.type == "complete":
-            print("All calculations completed")
-            for result in event.data["results"]:
-                print(f"Result: {result}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
-
-## Features
-
-- Asynchronous operation support
-- Tool execution with concurrent processing
-- Generic event streaming with type safety
-- Streaming responses
-- Error handling and retries
-- Configurable tool execution modes
-- Support for multiple tools
-- Type hints and validation
 
 ## Error Handling
 
@@ -328,7 +488,7 @@ The GeminiClient supports various configuration options:
 
 #### Basic Chat (No Tools)
 ```python
-client = GeminiClient(api_key="your-api-key")
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 async for response in client.chat(
     query="Tell me a story",
     model="gemini-pro",
@@ -340,7 +500,7 @@ async for response in client.chat(
 
 #### Chat with Tools (Any Mode)
 ```python
-client = GeminiClient(api_key="your-api-key")
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 async for response in client.chat(
     query="What's the weather in New York?",
     model="gemini-pro",
@@ -352,7 +512,7 @@ async for response in client.chat(
 
 #### Chat with Tools (Auto Mode)
 ```python
-client = GeminiClient(api_key="your-api-key")
+client = GeminiClient(api_key="your-api-key", chat_manager=chat_manager)
 async for response in client.chat(
     query="What's the weather in New York?",
     model="gemini-pro",
