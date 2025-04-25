@@ -190,6 +190,7 @@ class GeminiClient:
 
     async def chat(
         self,
+        chat_id: str,
         query: str,
         model: str,
         tools: List[Tool],
@@ -202,6 +203,7 @@ class GeminiClient:
         """Process a query using Gemini and available tools, streaming responses.
 
         Args:
+            chat_id: The chat ID
             query: The user's query
             model: The model to use
             tools: List of available tools
@@ -219,7 +221,6 @@ class GeminiClient:
             GeminiResponseError: If the response is invalid or empty
             GeminiToolExecutionError: If tool execution fails
         """
-        chat_id = "1"
         logger.info(f"Starting chat session with model: {model}, tool_mode: {tool_mode}")
         generation_request = await self.chat_manager.generate_content_request(
             chat_id=chat_id,
