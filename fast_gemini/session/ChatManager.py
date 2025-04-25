@@ -32,6 +32,7 @@ class ChatManager(BaseModel):
         cache_config: Optional[CacheConfig] = None,
     ) -> GenerateContentRequest:
         logger.info(f"Generating content request for chat_id: {chat_id}, model: {model}")
+        logger.debug(f"Tools provided: {[tool.name for tool in tools]}")
         # Prepare the config with context cache and tools.
         config = self.default_config.copy()
         if cache_config:

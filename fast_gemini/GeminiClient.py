@@ -219,9 +219,10 @@ class GeminiClient:
             GeminiResponseError: If the response is invalid or empty
             GeminiToolExecutionError: If tool execution fails
         """
+        chat_id = "1"
         logger.info(f"Starting chat session with model: {model}, tool_mode: {tool_mode}")
         generation_request = await self.chat_manager.generate_content_request(
-            chat_id="1",
+            chat_id=chat_id,
             query=query,
             model=model,
             client=self.client,
@@ -257,13 +258,14 @@ class GeminiClient:
             # Convert and execute tool calls
             tool_calls = await self._create_tool_calls(function_calls, tools)
             execution_result = await tool_executor.execute_tools(tool_calls)
-            
-            if not execution_result.should_proceed:
-                logger.debug("Tool execution indicates should not proceed, ending chat session")
-                break
 
             # Update messages with results
             await self._update_generation_request(generation_request, execution_result)
+
+            if not execution_result.should_proceed:
+                await self.chat_manager.chat_storage.update_history(chat_id, generation_request.contents)
+                logger.debug("Tool execution indicates should not proceed, ending chat session")
+                break
 
         if iteration >= max_iterations:
             logger.warning("Maximum tool iterations reached")
