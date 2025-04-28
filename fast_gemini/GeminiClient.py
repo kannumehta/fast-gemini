@@ -198,7 +198,8 @@ class GeminiClient:
         max_iterations: int = 10,
         num_gemini_call_retries: int = 1,
         tool_mode: str = "any",
-        cache_config: Optional[CacheConfig] = None
+        cache_config: Optional[CacheConfig] = None,
+        context: Optional[List[Dict[str, Any]]] = None
     ) -> AsyncGenerator[str, None]:
         """Process a query using Gemini and available tools, streaming responses.
 
@@ -212,6 +213,7 @@ class GeminiClient:
             num_gemini_call_retries: Number of retries to attempt on Gemini API calls (default: 1)
             tool_mode: Mode for tool calling - "any" or "auto" (default: "any")
             cache_config: Optional cache configuration for using cached content
+            context: Optional list of context objects to include in the prompt
 
         Yields:
             str: Stream of text responses
@@ -229,7 +231,8 @@ class GeminiClient:
             client=self.client,
             tools=tools,
             tool_mode=tool_mode,
-            cache_config=cache_config
+            cache_config=cache_config,
+            context=context
         )
 
         # Process response and handle tool calls

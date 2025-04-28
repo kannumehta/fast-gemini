@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Dict, Optional, ClassVar
+from typing import List, Dict, Optional, ClassVar, Any
+import json
 from ..CacheManager import CacheManager
 from .ChatStorage import ChatStorage
 from .ChatMessage import ChatMessage
@@ -30,6 +31,7 @@ class ChatManager(BaseModel):
         tools: List[Tool] = [],
         tool_mode: str = "auto",
         cache_config: Optional[CacheConfig] = None,
+        context: Optional[List[Dict[str, Any]]] = None,
     ) -> GenerateContentRequest:
         logger.info(f"Generating content request for chat_id: {chat_id}, model: {model}")
         logger.debug(f"Tools provided: {[tool.name for tool in tools]}")
@@ -47,7 +49,7 @@ class ChatManager(BaseModel):
             messages.append(ChatMessage.from_user_query(query))
         else:
             logger.debug("Creating new conversation with system prompt")
-            messages = [ChatMessage.from_user_query(self.__create_prompt_with_query(query))]
+            messages = [ChatMessage.from_user_query(self.__create_prompt_with_query(query, context))]
 
         return GenerateContentRequest(
             contents=messages,
@@ -89,9 +91,22 @@ class ChatManager(BaseModel):
         config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
         return config
     
-    def __create_prompt_with_query(self, query: str) -> str:
+    def __create_prompt_with_query(self, query: str, context: Optional[List[Dict[str, Any]]] = None) -> str:
         logger.debug("Creating prompt with query")
-        return f"""{self.system_prompt}
+        context_str = ""
+        if context:
+            try:
+                context_json = json.dumps(context)
+                context_str = f"\n<initial_context>\n{context_json}\n</initial_context>"
+            except Exception as e:
+                logger.error(f"Failed to serialize context: {str(e)}")
+        
+        final_prompt = f"""{self.system_prompt}
 
 CURRENT TASK:
-<user_query>{query}</user_query>"""
+<user_query>{query}</user_query>{context_str}"""
+
+        logger.debug("Final prompt with context:")
+        logger.debug(final_prompt)
+        
+        return final_prompt
