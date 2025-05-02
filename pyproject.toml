@@ -23,4 +23,4 @@ classifiers = [
 ]
 
 [tool.setuptools]
-packages = ["fast_gemini"] 
+packages = ["fast_gemini", "fast_gemini.session", "fast_gemini.utils"] 
