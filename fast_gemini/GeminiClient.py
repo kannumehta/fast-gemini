@@ -12,6 +12,7 @@ from .CacheConfig import CacheConfig
 from .session.ChatManager import ChatManager
 from .session.ChatMessage import ChatMessage
 from .session.GenerateContentRequest import GenerateContentRequest
+from .GeminiFile import GeminiFile
 from .utils.logger import get_logger
 
 logger = get_logger()
@@ -199,7 +200,8 @@ class GeminiClient:
         num_gemini_call_retries: int = 1,
         tool_mode: str = "any",
         cache_config: Optional[CacheConfig] = None,
-        context: Optional[List[Dict[str, Any]]] = None
+        context: Optional[List[Dict[str, Any]]] = None,
+        files: List[GeminiFile] = []
     ) -> AsyncGenerator[str, None]:
         """Process a query using Gemini and available tools, streaming responses.
 
@@ -214,6 +216,7 @@ class GeminiClient:
             tool_mode: Mode for tool calling - "any" or "auto" (default: "any")
             cache_config: Optional cache configuration for using cached content
             context: Optional list of context objects to include in the prompt
+            files: List of files to include in the conversation (default: [])
 
         Yields:
             str: Stream of text responses
@@ -232,7 +235,8 @@ class GeminiClient:
             tools=tools,
             tool_mode=tool_mode,
             cache_config=cache_config,
-            context=context
+            context=context,
+            files=files
         )
 
         # Process response and handle tool calls

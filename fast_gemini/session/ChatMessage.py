@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Dict, Union
 from pydantic import BaseModel
 from google.genai import types
+from ..GeminiFile import GeminiFile
 
 class Role(str, Enum):
     USER = "user"
@@ -18,9 +19,12 @@ class FunctionResult(BaseModel):
     tool_name: str
     tool_result: Dict
 
+class FileContent(BaseModel):
+    file: GeminiFile
+
 class ChatMessage(BaseModel):
     role: Role
-    content: Union[UserResponse, FunctionCall, FunctionResult]
+    content: Union[UserResponse, FunctionCall, FunctionResult, FileContent]
 
     def to_content(self) -> types.Content:
         """Convert ChatMessage to types.Content based on content type.
@@ -47,6 +51,14 @@ class ChatMessage(BaseModel):
                 parts=[types.Part.from_function_response(
                     name=self.content.tool_name,
                     response={"result": self.content.tool_result}
+                )]
+            )
+        elif isinstance(self.content, FileContent):
+            return types.Content(
+                role=self.role.value,
+                parts=[types.Part.from_uri(
+                    file_uri=self.content.file.uri,
+                    mime_type=self.content.file.mime_type
                 )]
             )
         else:
@@ -94,6 +106,8 @@ class ChatMessage(BaseModel):
             content = FunctionCall(**content_data)
         elif content_type == "FunctionResult":
             content = FunctionResult(**content_data)
+        elif content_type == "FileContent":
+            content = FileContent(**content_data)
         else:
             raise ValueError(f"Unknown content type: {content_type}")
             
@@ -144,4 +158,19 @@ class ChatMessage(BaseModel):
         return ChatMessage(
             role=Role.MODEL,
             content=FunctionResult(tool_name=tool_name, tool_result=tool_result)
+        )
+
+    @staticmethod
+    def from_file(file: GeminiFile) -> 'ChatMessage':
+        """Create a ChatMessage instance with a FileContent.
+        
+        Args:
+            file: The GeminiFile object containing uri and mime_type
+            
+        Returns:
+            ChatMessage: A new ChatMessage instance with FileContent
+        """
+        return ChatMessage(
+            role=Role.USER,
+            content=FileContent(file=file)
         )

@@ -6,6 +6,7 @@ from .ChatStorage import ChatStorage
 from .ChatMessage import ChatMessage
 from .GenerateContentRequest import GenerateContentRequest
 from ..CacheConfig import CacheConfig
+from ..GeminiFile import GeminiFile
 from google import genai
 from google.genai import types
 from ..Tool import Tool
@@ -32,6 +33,7 @@ class ChatManager(BaseModel):
         tool_mode: str = "auto",
         cache_config: Optional[CacheConfig] = None,
         context: Optional[List[Dict[str, Any]]] = None,
+        files: List[GeminiFile] = [],
     ) -> GenerateContentRequest:
         logger.info(f"Generating content request for chat_id: {chat_id}, model: {model}")
         logger.debug(f"Tools provided: {[tool.name for tool in tools]}")
@@ -47,9 +49,15 @@ class ChatManager(BaseModel):
         if messages or cache_config:
             logger.debug("Appending query to existing conversation history")
             messages.append(ChatMessage.from_user_query(query))
+            # Append files after the query
+            for file in files:
+                messages.append(ChatMessage.from_file(file))
         else:
             logger.debug("Creating new conversation with system prompt")
             messages = [ChatMessage.from_user_query(self.__create_prompt_with_query(query, context))]
+            # Append files after the query
+            for file in files:
+                messages.append(ChatMessage.from_file(file))
 
         return GenerateContentRequest(
             contents=messages,
