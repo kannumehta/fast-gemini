@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 from pydantic import BaseModel
-from .ChatMessage import ChatMessage
+from .ChatMessage import ChatMessage, Role
 
 class ChatStorage(BaseModel, ABC):
     """Abstract base class for chat storage implementations.
@@ -41,3 +41,14 @@ class ChatStorage(BaseModel, ABC):
             messages: The list of new chat messages to append to the existing history
         """
         pass
+
+    async def copy_model_response(self, from_chat_id: str, to_chat_id: str) -> None:
+        """Copy MODEL role messages from one chat to another.
+        
+        Args:
+            from_chat_id: The source chat ID to copy MODEL messages from
+            to_chat_id: The target chat ID to append MODEL messages to
+        """
+        messages = await self.get_history(from_chat_id)
+        model_messages = [msg for msg in messages if msg.role == Role.MODEL]
+        await self.append_history(to_chat_id, model_messages)
