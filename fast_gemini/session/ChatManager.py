@@ -92,11 +92,14 @@ class ChatManager(BaseModel):
     
     async def __get_config_with_tools(self, config: Dict, tools: List[Tool], tool_mode: str = "auto") -> Dict:
         logger.debug(f"Getting config with tools, mode: {tool_mode}")
-        config["tools"] = [types.Tool(function_declarations=[tool.function_definition for tool in tools])]
-        if not tools:
-            logger.debug("No tools provided, setting tool mode to auto")
-            tool_mode = "auto"
-        config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
+        if tools:
+            config["tools"] = [types.Tool(function_declarations=[tool.function_definition for tool in tools])]
+            config["tool_config"] = {"function_calling_config": {"mode": tool_mode}}
+        else:
+            logger.debug("No tools provided, removing tools config")
+            # Remove tools config if no tools are provided
+            config.pop("tools", None)
+            config.pop("tool_config", None)
         return config
     
     def __create_prompt_with_query(self, query: str, context: Optional[List[Dict[str, Any]]] = None) -> str:
