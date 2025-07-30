@@ -100,6 +100,7 @@ class ChatManager(BaseModel):
             # Remove tools config if no tools are provided
             config.pop("tools", None)
             config.pop("tool_config", None)
+            config.pop("automatic_function_calling", None)
         return config
     
     def __create_prompt_with_query(self, query: str, context: Optional[List[Dict[str, Any]]] = None) -> str:
